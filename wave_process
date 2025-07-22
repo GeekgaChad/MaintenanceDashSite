@@ -1,0 +1,152 @@
+import pandas as pd
+import re
+import pandas as pd
+import os
+
+import pandas as pd
+import os
+import numpy as np
+import re
+
+
+
+import sqlite3
+conn = sqlite3.connect("site_reporting.db")
+for table in ["maintenance_reports", "daily_safety_patrol", "qc_activities"]:
+    print(f"Sample from {table}:")
+    for row in conn.execute(f"SELECT * FROM {table} LIMIT 3;"):
+        print(row)
+    print()
+conn.close()
+
+
+
+
+'''
+# --- CONFIGURE THESE ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+RAW_DATA_PATH = os.path.join(PROJECT_ROOT, "raw_data")
+# path to your WAVE file (you already have RAW_DATA_PATH in your script)
+wave_file = os.path.join(RAW_DATA_PATH, "WAVE-I_Daily_Activity_Report_30_June_2025.xlsx")
+
+MAINTENANCE_SECTIONS = [
+    "Rotating", "Static", "Electrical", "Instrument",
+    "Scaffolding", "Boom Truck", "Crane", "Insulation"
+]
+PATROL_SECTIONS = ["HSE Activities", "Daily Safety Patrol"]
+QC_SECTIONS     = ["QC Activities"]
+
+ALL_SECTION_LABELS = MAINTENANCE_SECTIONS + PATROL_SECTIONS + QC_SECTIONS
+
+# 1) pick the sheet you want to test
+xls = pd.ExcelFile(wave_file)
+print("[INFO] Available sheets:", xls.sheet_names)
+
+target_date = "June 19 2025"
+for s in xls.sheet_names:
+    if target_date in s:
+        sheet_name = s.strip()
+        break
+else:
+    raise ValueError(f"Could not find any sheet with '{target_date}'")
+
+print(f"[INFO] → Parsing sheet: {sheet_name}")
+
+raw = pd.read_excel(wave_file, sheet_name=sheet_name, header=None)
+
+# extract report_date from the sheet name
+m = re.search(r"\((.*?)\)", sheet_name)
+report_date = pd.to_datetime(m.group(1), errors="coerce").strftime("%Y-%m-%d") if m else "N/A"
+
+# 2) locate where each section starts
+section_starts = {}
+for idx, cell in raw[0].items():
+    if isinstance(cell, str):
+        low = cell.lower()
+        for label in ALL_SECTION_LABELS:
+            if label.lower() in low:
+                section_starts[label] = idx
+
+print("[INFO] Found sections:", section_starts)
+
+# 3) sort by row
+ordered = sorted(section_starts.items(), key=lambda x: x[1])
+
+# 4) containers
+maintenance_parts = []
+patrol_parts      = []
+qc_parts          = []
+
+# 5) loop
+for i, (sec, start_row) in enumerate(ordered):
+    end_row = raw.shape[0]
+    if i + 1 < len(ordered):
+        end_row = ordered[i+1][1]
+
+    block = raw.iloc[start_row+1:end_row].copy()
+    block.dropna(how="all", inplace=True)
+    if block.empty:
+        continue
+
+    # detect the real header row *per category*
+    if sec in MAINTENANCE_SECTIONS:
+        # look for row that has both "Area" and "Unit"
+        mask = block.apply(lambda r: 
+            r.astype(str).str.contains("area", case=False, na=False).any() and
+            r.astype(str).str.contains("unit", case=False, na=False).any()
+        , axis=1)
+
+    elif sec in PATROL_SECTIONS:
+        # look for "Permit No"
+        mask = block.apply(lambda r: 
+            r.astype(str).str.contains("permit no", case=False, na=False).any()
+        , axis=1)
+
+    elif sec in QC_SECTIONS:
+        # look for "S/N"
+        mask = block.apply(lambda r: 
+            r.astype(str).str.contains(r"s/n", case=False, na=False).any()
+        , axis=1)
+    else:
+        continue
+
+    if not mask.any():
+        print(f"[WARN] no header row found for section {sec}, skipping")
+        continue
+
+    hdr_idx = mask[mask].index[0]
+    block = block.loc[hdr_idx:]              # keep from header downward
+    block.columns = block.iloc[0]            # set header
+    block = block.iloc[1:].reset_index(drop=True)
+
+    # normalize column names
+    block.columns = [
+        str(c).strip().lower().replace(" ", "_") for c in block.columns
+    ]
+    block["section"]     = sec
+    block["report_date"] = report_date
+
+    # assign to the right list
+    if sec in MAINTENANCE_SECTIONS:
+        maintenance_parts.append(block)
+    elif sec in PATROL_SECTIONS:
+        patrol_parts.append(block)
+    else:
+        qc_parts.append(block)
+
+# 6) combine
+df_maintenance = pd.concat(maintenance_parts, ignore_index=True) if maintenance_parts else pd.DataFrame()
+df_patrol      = pd.concat(patrol_parts,      ignore_index=True) if patrol_parts      else pd.DataFrame()
+df_qc          = pd.concat(qc_parts,          ignore_index=True) if qc_parts          else pd.DataFrame()
+
+# 7) inspect
+print("\n[INFO] --- MAINTENANCE ---")
+print(df_maintenance.head(), "\n")
+print("[INFO] --- PATROL ---")
+print(df_patrol.head(),      "\n")
+print("[INFO] --- QC ---")
+print(df_qc.head())
+
+
+'''
