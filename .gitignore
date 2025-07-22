@@ -1,0 +1,18 @@
+# Ignore Python cache and venvs
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Ignore SQLite DBs except the sample one
+*.db
+!sample_site_reporting.db
+
+# Ignore any environment variables/secrets files
+.env
+.env.*
+
+# Ignore OS junk
+.DS_Store
+Thumbs.db

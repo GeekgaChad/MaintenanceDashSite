@@ -1,0 +1,8 @@
+
+# requirements.txt
+
+streamlit>=1.30
+pandas
+matplotlib
+streamlit-authenticator
+#sqlite3  # This is built-in with Python, so doesn't need to be installed
