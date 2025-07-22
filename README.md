@@ -18,7 +18,7 @@ This is a demo/preview of a **Site Maintenance Reporting Dashboard** built with 
 
 ---
 
-## 🚀 How To Run Locally
+## How To Run Locally
 
 1. **Clone this repository**
    ```bash
