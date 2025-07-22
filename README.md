@@ -1,6 +1,6 @@
 # MaintenanceDashSite
 
-## 🚧 NDA-Safe Maintenance Dashboard Demo
+## NDA-Safe Maintenance Dashboard Demo
 
 This is a demo/preview of a **Site Maintenance Reporting Dashboard** built with [Streamlit](https://streamlit.io/) for internal use.
 
@@ -18,7 +18,7 @@ This is a demo/preview of a **Site Maintenance Reporting Dashboard** built with 
 
 ---
 
-## 🚀 How To Run Locally
+## How To Run Locally
 
 1. **Clone this repository**
     ```bash
@@ -47,7 +47,7 @@ This is a demo/preview of a **Site Maintenance Reporting Dashboard** built with 
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ├── .gitignore
 ├── create_sample_db.py # Script to create the dummy/sample database
@@ -64,7 +64,7 @@ Edit
 
 ---
 
-## 📝 Notes
+## Notes
 
 - **Dummy DB Only:**  
   This repo includes only a DUMMY database (`sample_site_reporting.db`) to allow code review and feature testing.  
@@ -78,7 +78,7 @@ Edit
 
 ---
 
-## 📧 Contact
+## Contact
 
 For access, deployment, or integration questions, please contact [msagar2606@gmail.com].
 
