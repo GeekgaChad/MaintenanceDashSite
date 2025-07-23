@@ -374,7 +374,7 @@ elif menu == "📊 Patrol Dashboard":
             st.bar_chart(filtered_patrol['type'].value_counts().head(10), use_container_width=True)
 
     if st.checkbox("Show 'Patrols per Area' Chart", value=True):
-        st.subheader("### Patrols per Area")
+        st.write("### Patrols per Area")
         st.bar_chart(filtered_patrol['area'].value_counts(), use_container_width=True)
 
     if st.checkbox("Show 'By Status' Chart", value=True):
