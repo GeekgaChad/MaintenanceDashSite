@@ -74,7 +74,7 @@ elif menu == "➕ Submit Maintenance Report":
         submit = st.form_submit_button("Submit Record")
     if submit:
         import sqlite3
-        DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/sample_site_reporting.db"
+        DB_PATH = "sample_site_reporting.db"
         with sqlite3.connect(DB_PATH) as conn:
             cur = conn.cursor()
             cur.execute("""
