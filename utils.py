@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/sample_site_reporting.db"
+DB_PATH = "sample_site_reporting.db"
 
 def get_table(table):
     with sqlite3.connect(DB_PATH) as conn:
