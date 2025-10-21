@@ -1,0 +1,16 @@
+credentials:
+  usernames:
+    user1:
+      email: user1@email.com
+      name: User One
+      password: '$2b$12$9o8whQ4Sk9Svu4fT8U8Gu.xNedU4OBEJkvXvWBzU9Ugnqx9Dbfd1G' # Hashed password
+
+cookie:
+  expiry_days: 1
+  key: "some_signature_key"
+  name: "some_cookie_name"
+
+preauthorized:
+  emails:
+    - user1@email.com
+    -  friend1@email.com
