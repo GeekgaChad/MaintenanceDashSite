@@ -132,7 +132,7 @@ if check_password():
     if menu == "🧾 WO 360 Entry":
         # ... (WO 360 Entry helpers and logic remain here) ...
         st.title("WO 360 — Single Entry")
-        DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/site_reporting.db"
+        DB_PATH = "sample_site_reporting.db"
 
         # ---- helpers (inline; move to utils later if you want) ----
         def parse_date(d):
