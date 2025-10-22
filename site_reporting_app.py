@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from utils import get_table, time_to_hours, get_wo_permit_overview
+from utils import get_table, time_to_hours, get_wo_permit_overview, format_timedelta_to_h_m
 
 
 import altair as alt
@@ -13,6 +13,7 @@ from datetime import datetime
 
 # Simple password protection
 def check_password():
+    #return True  # Disable password protection for now
     def password_entered():
         if st.session_state["password"] == "mypassword123":
             st.session_state["password_correct"] = True
@@ -63,25 +64,48 @@ def load_maintenance_data():
 @st.cache_data(ttl=600)
 def load_wpr_data():
     wpr = get_table("WPR")
+    #print(wpr.columns.tolist())
+    #print('time of requesting permit')
+    #print(wpr['time_of_requesting_permit'])
+    #print('time of issuer starting swp preperation')
+    #print(wpr['time_of_issuer_starting_swp_preperation'])
+    #print('time of permit issuance')
+    #print(wpr['time_of_permit_issuance'])
+    #rint('swp closing time')
+    #print(wpr['swp_closing_time'])
     
     # 1. Standard Date/Time Conversions
     wpr['date'] = pd.to_datetime(wpr['date'], errors='coerce')
     wpr['work_actual_start_time'] = pd.to_datetime(wpr['work_actual_start_time'], errors='coerce')
     wpr['work_finish_time'] = pd.to_datetime(wpr['work_finish_time'], errors='coerce')
+
     
     # 2. Robust Time Parsing Function (FIXED to handle NaT and invalid strings)
     def parse_time_only(t):
-        if pd.isna(t) or not str(t).strip() or str(t).lower() == 'nat':
-            return None
-        
-        # Coerce string 'HH:MM' into a datetime object
-        dt = pd.to_datetime(str(t), format='%H:%M', errors='coerce')
-        
-        # Check if coercion failed (resulted in NaT)
-        if pd.isna(dt):
-            return None
-        
-        return dt.time()
+            if pd.isna(t) or not str(t).strip() or str(t).lower() == 'nat':
+                return None
+            
+            s = str(t).strip()
+            
+            # 🚨 FIX 1: Replace semicolon with colon and strip milliseconds
+            # This handles '13;20' and '07:00:00.000000'
+            s = s.replace(";", ":")
+            
+            # Optional: Try to remove milliseconds if present, as they mess up simple format inferral
+            if '.' in s:
+                s = s.split('.')[0]
+            
+            # Coerce string into a datetime object (trying common HH:MM:SS and HH:MM formats)
+            dt = pd.to_datetime(s, format='%H:%M:%S', errors='coerce')
+            if pd.isna(dt):
+                dt = pd.to_datetime(s, format='%H:%M', errors='coerce')
+            
+            # Check if coercion failed (resulted in NaT)
+            if pd.isna(dt):
+                return None
+            
+            # 🚨 FIX 2: Return a formatted string for display in Streamlit
+            return dt.strftime('%H:%M')
 
     # Apply fix to all time columns
     # 🚨 FIX for ValueError: NaTType
@@ -94,7 +118,7 @@ def load_wpr_data():
     # 3. Calculation Conversions
     wpr['work_duration'] = wpr['(m-l)'].apply(time_to_hours)
     wpr['total_permit_time'] = wpr['(n-i)'].apply(time_to_hours)
-    wpr['efficiency'] = pd.to_numeric(wpr['(m-l)/(n-i)'], errors='coerce')
+    wpr['efficiency'] = round(pd.to_numeric(wpr['(m-l)/(n-i)'], errors='coerce'),2)
     return wpr
 
 
@@ -121,8 +145,8 @@ if check_password():
             "📊 Permit Dashboard",
             # 6. QC Dashboard
             "📊 QC Dashboard",
-            # 7. Patrol Dashboard
-            "📊 Patrol Dashboard",
+            # 7. Safety Dashboard
+            "📊 Safety Dashboard",
         ]
     )
 
@@ -133,6 +157,7 @@ if check_password():
         # ... (WO 360 Entry helpers and logic remain here) ...
         st.title("WO 360 — Single Entry")
         DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/site_reporting.db"
+        #DB_PATH = "site_reporting.db"
 
         # ---- helpers (inline; move to utils later if you want) ----
         def parse_date(d):
@@ -343,6 +368,7 @@ if check_password():
 
         # Load data using the cached function
         df = load_maintenance_data()
+        df = df.drop(columns='date', errors='ignore')
 
         with st.expander("🔎 Filter Records", expanded=False):
             col1, col2, col3, col4 = st.columns(4)
@@ -485,6 +511,7 @@ if check_password():
     elif menu == "🔗 WO & Permit Overview":
         st.title("Unified Work Order & Permit Overview")
         df = get_wo_permit_overview()
+
         with st.expander("🔎 Filter Records", expanded=False):
             col1, col2 = st.columns([2,3])
             if not df['maintenance_report_date'].isnull().all():
@@ -534,6 +561,27 @@ if check_password():
         min_date, max_date = wpr['date'].min(), wpr['date'].max()
         date_range = st.date_input("Date Range", [min_date, max_date], key="permit_date")
         filtered = wpr
+
+        filtered['Work Duration (H:M)'] = filtered['(m-l)'].apply(format_timedelta_to_h_m)
+
+        # 2. Format the (n-i) column (Permit Cycle Time)
+        filtered['Permit Cycle (H:M)'] = filtered['(n-i)'].apply(format_timedelta_to_h_m)
+
+        # 3. Optional: Format the efficiency percentage to two decimals (if it's not already)
+        
+
+        # filtering the decimals
+        filtered["work_duration"] = round(filtered["work_duration"], 2)
+        filtered["total_permit_time"] = round(filtered["total_permit_time"], 2)
+        filtered["efficiency"] = round(filtered["efficiency"], 2)
+        filtered['Efficiency (%)'] = filtered['efficiency']
+
+        
+        filtered.drop(columns=['duration'], errors='ignore', inplace=True) # same as work_duration 
+
+        print(filtered.columns.tolist())
+
+
         if len(date_range) == 2:
             start, end = pd.to_datetime(date_range)
             filtered = wpr[(wpr['date'] >= start) & (wpr['date'] <= end)]
@@ -587,6 +635,7 @@ if check_password():
         st.subheader("Efficiency vs Permit Times (Outlier Detection)")
         
         scatter_data = filtered.copy()
+        print(scatter_data)
         scatter_data = scatter_data[
             (scatter_data['work_duration'].notna()) & 
             (scatter_data['total_permit_time'].notna()) &
@@ -634,7 +683,29 @@ if check_password():
             st.line_chart(eff_trend, use_container_width=True)
 
         st.write("### Permit Table")
-        st.dataframe(filtered, use_container_width=True)
+        st.dataframe(
+                    filtered[[
+                        'receiver_name', 
+                        'position', 
+                        'date', 
+                        'crew_members', 
+                        'wo_number', 
+                        'wo_description', 
+                        'permit_number', 
+                        'plant/rtm_no', 
+                        'time_of_requesting_permit', 
+                        'time_of_issuer_starting_swp_preperation', 
+                        'time_of_permit_issuance', 
+                        'work_actual_start_time', 
+                        'work_finish_time', 
+                        'swp_closing_time', 
+                        'remarks', 
+                        'Work Duration (H:M)', 
+                        'Permit Cycle (H:M)', 
+                        'Efficiency (%)'
+                    ]],
+                    width='stretch')
+
 
 
     # ----------------------------------------------------------------------
@@ -714,7 +785,7 @@ if check_password():
     # ----------------------------------------------------------------------
     # ---- 7. PATROL DASHBOARD (UNCHANGED) ----
     # ----------------------------------------------------------------------
-    elif menu == "📊 Patrol Dashboard":
+    elif menu == "📊 Safety Dashboard":
         st.title("Daily Safety Patrol Dashboard")
         patrol = get_table("daily_safety_patrol")
         patrol['report_date'] = pd.to_datetime(patrol['report_date'], errors='coerce')

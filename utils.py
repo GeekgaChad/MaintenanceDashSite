@@ -1,8 +1,8 @@
 import sqlite3
 import pandas as pd
 
-DB_PATH = "sample_site_reporting.db"
-
+DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/site_reporting.db"
+#DB_PATH = "site_reporting.db"
 def get_table(table):
     with sqlite3.connect(DB_PATH) as conn:
         return pd.read_sql(f"SELECT * FROM {table}", conn)
@@ -47,4 +47,57 @@ def get_wo_permit_overview():
             LEFT JOIN MAP map ON mr.wo_number = map."wo_＃"
         """
         df = pd.read_sql_query(query, conn)
+
+        columns_to_drop = ['map_sn', 'map_area', 'execution_date']
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+
+        df['efficiency'] = round(pd.to_numeric(df['efficiency'], errors='coerce'),2)
+
+        df['work_actual_start_time'] = df['work_actual_start_time'].apply(format_timedelta_to_h_m)
+        df['work_finish_time'] = df['work_finish_time'].apply(format_timedelta_to_h_m)
+        df['work_duration'] = df['work_duration'].apply(format_timedelta_to_h_m)
+        df['total_permit_time'] = df['total_permit_time'].apply(format_timedelta_to_h_m)
+
+        
     return df
+
+# Place this revised function in your utilities file (utils.py or before calling it)
+
+def format_timedelta_to_h_m(td):
+    """
+    Converts a string duration or Timedelta to a string format like 'HH:MM'.
+    
+    This function handles both Timedelta objects and string representations 
+    of time that may be present in the DataFrame.
+    """
+    if pd.isna(td):
+        return None
+    
+    # 🚨 FIX: Convert to Timedelta if the input is a string
+    if isinstance(td, str):
+        try:
+            td = pd.to_timedelta(td)
+        except ValueError:
+            # Handle cases where the string isn't a valid timedelta format
+            return "Invalid Format"
+    
+    # Check if the result is a Timedelta object (or NaT)
+    if pd.isna(td) or not isinstance(td, pd.Timedelta):
+        return None
+    
+    # Calculation (Original Logic)
+    total_seconds = td.total_seconds()
+    
+    # Handle negative durations if necessary (though rare for work/permit times)
+    sign = "-" if total_seconds < 0 else ""
+    abs_seconds = abs(total_seconds)
+    
+    # Calculate hours and minutes
+    hours = int(abs_seconds // 3600)
+    minutes = int((abs_seconds % 3600) // 60)
+    
+    # Return formatted string: [sign]HH:MM
+    return f"{sign}{hours:02d}:{minutes:02d}"
+
+# NOTE: No changes are needed to the application code where you call this:
+# filtered['Work Duration (H:M)'] = filtered['(m-l)'].apply(format_timedelta_to_h_m)
