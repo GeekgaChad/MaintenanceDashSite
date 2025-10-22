@@ -13,7 +13,7 @@ from datetime import datetime
 
 # Simple password protection
 def check_password():
-    return True  # Disable password protection for now
+    #return True  # Disable password protection for now
     def password_entered():
         if st.session_state["password"] == "mypassword123":
             st.session_state["password_correct"] = True
