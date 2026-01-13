@@ -5,4 +5,6 @@ streamlit>=1.30
 pandas
 matplotlib
 streamlit-authenticator
+psycopg2-binary
+sqlalchemy
 #sqlite3  # This is built-in with Python, so doesn't need to be installed
