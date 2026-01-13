@@ -1,12 +1,29 @@
 import sqlite3
 import pandas as pd
+import psycopg2
+import streamlit as st
 
 #DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/site_reporting.db"
-DB_PATH = "sample_site_reporting.db"
+#DB_PATH = "sample_site_reporting.db"
+'''
 def get_table(table):
     with sqlite3.connect(DB_PATH) as conn:
         return pd.read_sql(f"SELECT * FROM {table}", conn)
+'''
 
+def get_connection():
+    # Retrieve the Frankfurt URI from the secure Streamlit vault
+    return psycopg2.connect(st.secrets["database"]["url"])
+
+def get_table(table):
+    conn = get_connection()
+    try:
+        # PostgreSQL uses double quotes to ensure table names are read correctly
+        query = f'SELECT * FROM "{table}"'
+        return pd.read_sql(query, conn)
+    finally:
+        conn.close()
+        
 def time_to_hours(t):
     try:
         if pd.isnull(t):
