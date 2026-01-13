@@ -1,21 +1,14 @@
-import sqlite3
 import pandas as pd
 import psycopg2
 import streamlit as st
-
-#DB_PATH = "/Users/msagar/SankyuWork/site_reporting_project/site_reporting.db"
-#DB_PATH = "sample_site_reporting.db"
-'''
-def get_table(table):
-    with sqlite3.connect(DB_PATH) as conn:
-        return pd.read_sql(f"SELECT * FROM {table}", conn)
-'''
+import os
 
 def get_connection():
-    # Retrieve the Frankfurt URI from the secure Streamlit vault
+    """Retrieve the Frankfurt URI from the secure Streamlit vault."""
     return psycopg2.connect(st.secrets["database"]["url"])
 
 def get_table(table):
+    """Fetch an entire table from the Cloud PostgreSQL vault."""
     conn = get_connection()
     try:
         # PostgreSQL uses double quotes to ensure table names are read correctly
@@ -23,22 +16,12 @@ def get_table(table):
         return pd.read_sql(query, conn)
     finally:
         conn.close()
-        
-def time_to_hours(t):
-    try:
-        if pd.isnull(t):
-            return None
-        if isinstance(t, (pd.Timedelta, pd._libs.tslibs.timedeltas.Timedelta)):
-            return t.total_seconds() / 3600
-        if isinstance(t, str):
-            td = pd.to_timedelta(t)
-            return td.total_seconds() / 3600
-        return float(t)
-    except Exception:
-        return None
 
 def get_wo_permit_overview():
-    with sqlite3.connect(DB_PATH) as conn:
+    """Unified view for the Overview Dashboard using Cloud PostgreSQL."""
+    conn = get_connection()
+    try:
+        # Note: PostgreSQL uses double quotes for column names with special characters like #
         query = """
             SELECT 
                 mr.wo_number AS maintenance_wo,
@@ -54,67 +37,82 @@ def get_wo_permit_overview():
                 wpr."(m-l)/(n-i)" AS efficiency,
                 qc.id AS qc_id,
                 qc.area AS qc_area,
-                qc.scope_of_work,
-                map.sn AS map_sn,
-                map.area AS map_area,
-                map.execution_date
+                qc.scope_of_work
             FROM maintenance_reports mr
-            LEFT JOIN WPR wpr ON mr.wo_number = wpr.wo_number
+            LEFT JOIN "WPR" wpr ON mr.wo_number = wpr.wo_number
             LEFT JOIN qc_activities qc ON mr.wo_number = qc.wo_number
-            LEFT JOIN MAP map ON mr.wo_number = map."wo_＃"
+            LEFT JOIN "MAP" map ON mr.wo_number = map."wo_#"
         """
         df = pd.read_sql_query(query, conn)
-
-        columns_to_drop = ['map_sn', 'map_area', 'execution_date']
-        df = df.drop(columns=columns_to_drop, errors='ignore')
-
-        df['efficiency'] = round(pd.to_numeric(df['efficiency'], errors='coerce'),2)
-
-        df['work_actual_start_time'] = df['work_actual_start_time'].apply(format_timedelta_to_h_m)
-        df['work_finish_time'] = df['work_finish_time'].apply(format_timedelta_to_h_m)
-        df['work_duration'] = df['work_duration'].apply(format_timedelta_to_h_m)
-        df['total_permit_time'] = df['total_permit_time'].apply(format_timedelta_to_h_m)
-
         
-    return df
+        # Data formatting logic
+        df['efficiency'] = round(pd.to_numeric(df['efficiency'], errors='coerce'), 2)
+        
+        time_cols = ['work_actual_start_time', 'work_finish_time', 'work_duration', 'total_permit_time']
+        for col in time_cols:
+            df[col] = df[col].apply(format_timedelta_to_h_m)
+            
+        return df
+    finally:
+        conn.close()
 
-# Place this revised function in your utilities file (utils.py or before calling it)
+def insert_wpr(conn, payload):
+    """Professional Write logic for Work Permits."""
+    cols = [
+        "receiver_name","position","date","crew_members","wo_number","wo_description",
+        "permit_number","plant/rtm_no","time_of_requesting_permit",
+        "time_of_issuer_starting_swp_preperation","time_of_permit_issuance",
+        "work_actual_start_time","work_finish_time","swp_closing_time",
+        "remarks","(m-l)","(n-i)","(m-l)/(n-i)"
+    ]
+    # PostgreSQL uses %s placeholders
+    placeholders = ",".join(["%s"] * len(cols))
+    query = f'INSERT INTO "WPR" ({",".join([f'"{c}"' for c in cols])}) VALUES ({placeholders})'
+    
+    with conn.cursor() as cur:
+        cur.execute(query, [payload.get(c) for c in cols])
+
+def insert_dmr(conn, payload):
+    """Professional Write logic for Maintenance Reports."""
+    cols = [
+        "area","unit","tag_number","wo_number","observation","recommendation",
+        "date","status","reason_remark","root_cause","section","report_date"
+    ]
+    placeholders = ",".join(["%s"] * len(cols))
+    query = f'INSERT INTO "maintenance_reports" ({",".join(cols)}) VALUES ({placeholders})'
+    
+    with conn.cursor() as cur:
+        cur.execute(query, [payload.get(c) for c in cols])
+
+def time_to_hours(t):
+    """Utility to convert time strings/timedeltas to numeric hours."""
+    try:
+        if pd.isnull(t):
+            return None
+        if isinstance(t, (pd.Timedelta, pd._libs.tslibs.timedeltas.Timedelta)):
+            return t.total_seconds() / 3600
+        if isinstance(t, str):
+            td = pd.to_timedelta(t)
+            return td.total_seconds() / 3600
+        return float(t)
+    except Exception:
+        return None
 
 def format_timedelta_to_h_m(td):
-    """
-    Converts a string duration or Timedelta to a string format like 'HH:MM'.
-    
-    This function handles both Timedelta objects and string representations 
-    of time that may be present in the DataFrame.
-    """
+    """Formats durations for visual interpretability."""
     if pd.isna(td):
         return None
-    
-    # 🚨 FIX: Convert to Timedelta if the input is a string
     if isinstance(td, str):
         try:
             td = pd.to_timedelta(td)
         except ValueError:
-            # Handle cases where the string isn't a valid timedelta format
             return "Invalid Format"
-    
-    # Check if the result is a Timedelta object (or NaT)
-    if pd.isna(td) or not isinstance(td, pd.Timedelta):
+    if not isinstance(td, pd.Timedelta):
         return None
     
-    # Calculation (Original Logic)
     total_seconds = td.total_seconds()
-    
-    # Handle negative durations if necessary (though rare for work/permit times)
     sign = "-" if total_seconds < 0 else ""
     abs_seconds = abs(total_seconds)
-    
-    # Calculate hours and minutes
     hours = int(abs_seconds // 3600)
     minutes = int((abs_seconds % 3600) // 60)
-    
-    # Return formatted string: [sign]HH:MM
     return f"{sign}{hours:02d}:{minutes:02d}"
-
-# NOTE: No changes are needed to the application code where you call this:
-# filtered['Work Duration (H:M)'] = filtered['(m-l)'].apply(format_timedelta_to_h_m)
