@@ -119,6 +119,11 @@ def load_wpr_data():
     wpr['work_duration'] = wpr['(m-l)'].apply(time_to_hours)
     wpr['total_permit_time'] = wpr['(n-i)'].apply(time_to_hours)
     wpr['efficiency'] = round(pd.to_numeric(wpr['(m-l)/(n-i)'], errors='coerce'),2)
+    # Ensure numeric types for calculation columns
+    numeric_cols = ['work_duration', 'total_permit_time', 'efficiency']
+    for col in numeric_cols:
+        if col in wpr.columns:
+            wpr[col] = pd.to_numeric(wpr[col], errors='coerce')
     return wpr
 
 
@@ -570,9 +575,13 @@ if check_password():
         
 
         # filtering the decimals
-        filtered["work_duration"] = round(filtered["work_duration"], 2)
-        filtered["total_permit_time"] = round(filtered["total_permit_time"], 2)
-        filtered["efficiency"] = round(filtered["efficiency"], 2)
+        # filtering the decimals - ensure they are float first
+        for col in ["work_duration", "total_permit_time", "efficiency"]:
+            filtered[col] = pd.to_numeric(filtered[col], errors='coerce')
+        
+        filtered["work_duration"] = filtered["work_duration"].round(2)
+        filtered["total_permit_time"] = filtered["total_permit_time"].round(2)
+        filtered["efficiency"] = filtered["efficiency"].round(2)
         filtered['Efficiency (%)'] = filtered['efficiency']
 
         
