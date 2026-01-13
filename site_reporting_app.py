@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from utils import get_table, time_to_hours, get_wo_permit_overview, format_timedelta_to_h_m
+from utils import get_connection get_table, time_to_hours, get_wo_permit_overview, format_timedelta_to_h_m
 
 
 import altair as alt
