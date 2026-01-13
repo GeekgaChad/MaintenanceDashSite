@@ -7,4 +7,5 @@ matplotlib
 streamlit-authenticator
 psycopg2-binary
 sqlalchemy
+altair
 #sqlite3  # This is built-in with Python, so doesn't need to be installed
