@@ -6,9 +6,8 @@ from utils import get_connection, get_table, insert_wpr, insert_dmr, time_to_hou
 
 import altair as alt
 
-import sqlite3
-from datetime import datetime
 
+from datetime import datetime
 
 
 # Simple password protection
