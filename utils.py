@@ -21,7 +21,7 @@ def get_wo_permit_overview():
     """Unified view for the Overview Dashboard using Cloud PostgreSQL."""
     conn = get_connection()
     try:
-        # 🚨 FIX: Fully qualify all tables and columns with double quotes for PG strictness
+        # 🚨 FIX: All tables and special columns MUST be double-quoted for PostgreSQL
         query = """
             SELECT 
                 mr.wo_number AS maintenance_wo,
@@ -32,23 +32,24 @@ def get_wo_permit_overview():
                 wpr.date AS permit_date,
                 wpr.work_actual_start_time,
                 wpr.work_finish_time,
-                wpr."(m-l)" AS work_duration,
-                wpr."(n-i)" AS total_permit_time,
-                wpr."(m-l)/(n-i)" AS efficiency,
+                wpr."(m-l)" AS work_duration,       -- Double quotes required for (m-l)
+                wpr."(n-i)" AS total_permit_time,   -- Double quotes required for (n-i)
+                wpr."(m-l)/(n-i)" AS efficiency,   -- Double quotes required for math cols
                 qc.id AS qc_id,
                 qc.area AS qc_area,
                 qc.scope_of_work
             FROM "maintenance_reports" mr
             LEFT JOIN "WPR" wpr ON mr.wo_number = wpr.wo_number
             LEFT JOIN "qc_activities" qc ON mr.wo_number = qc.wo_number
-            LEFT JOIN "MAP" m ON mr.wo_number = m."wo_#"
+            LEFT JOIN "MAP" m ON mr.wo_number = m."wo_#"   -- Double quotes required for wo_#
         """
         df = pd.read_sql_query(query, conn)
         
-        # Ensure efficiency is numeric before rounding
+        # Ensure efficiency is numeric before rounding to prevent TypeErrors
         df['efficiency'] = pd.to_numeric(df['efficiency'], errors='coerce')
         df['efficiency'] = df['efficiency'].round(2)
         
+        # Apply visual formatting
         time_cols = ['work_actual_start_time', 'work_finish_time', 'work_duration', 'total_permit_time']
         for col in time_cols:
             if col in df.columns:
