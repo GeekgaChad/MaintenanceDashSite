@@ -21,7 +21,7 @@ def get_wo_permit_overview():
     """Unified view for the Overview Dashboard using Cloud PostgreSQL."""
     conn = get_connection()
     try:
-        # Note: PostgreSQL uses double quotes for column names with special characters like #
+        # 🚨 FIX: Fully qualify all tables and columns with double quotes for PG strictness
         query = """
             SELECT 
                 mr.wo_number AS maintenance_wo,
@@ -38,19 +38,21 @@ def get_wo_permit_overview():
                 qc.id AS qc_id,
                 qc.area AS qc_area,
                 qc.scope_of_work
-            FROM maintenance_reports mr
+            FROM "maintenance_reports" mr
             LEFT JOIN "WPR" wpr ON mr.wo_number = wpr.wo_number
-            LEFT JOIN qc_activities qc ON mr.wo_number = qc.wo_number
-            LEFT JOIN "MAP" map ON mr.wo_number = map."wo_#"
+            LEFT JOIN "qc_activities" qc ON mr.wo_number = qc.wo_number
+            LEFT JOIN "MAP" m ON mr.wo_number = m."wo_#"
         """
         df = pd.read_sql_query(query, conn)
         
-        # Data formatting logic
-        df['efficiency'] = round(pd.to_numeric(df['efficiency'], errors='coerce'), 2)
+        # Ensure efficiency is numeric before rounding
+        df['efficiency'] = pd.to_numeric(df['efficiency'], errors='coerce')
+        df['efficiency'] = df['efficiency'].round(2)
         
         time_cols = ['work_actual_start_time', 'work_finish_time', 'work_duration', 'total_permit_time']
         for col in time_cols:
-            df[col] = df[col].apply(format_timedelta_to_h_m)
+            if col in df.columns:
+                df[col] = df[col].apply(format_timedelta_to_h_m)
             
         return df
     finally:
