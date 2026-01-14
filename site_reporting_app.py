@@ -156,7 +156,7 @@ if check_password():
     )
 
     # ----------------------------------------------------------------------
-    # ---- 1. WO 360 ENTRY (UNCHANGED) ----
+    # ---- 1. WO 360 ENTRY (CLOUD SYNC REFACTORED) ----
     # ----------------------------------------------------------------------
     if menu == "🧾 WO 360 Entry":
         st.title("WO 360 — Single Entry (Cloud Sync)")
@@ -181,18 +181,68 @@ if check_password():
             except Exception: return None
 
         # --- Entry Form ---
+        # 🚨 UI variables are defined inside this block to ensure they stay in scope
         with st.form("wo360", clear_on_submit=False):
-            # ... (UI input fields remain exactly as you had them) ...
-            # [Ensure all your st.text_input and st.selectbox fields are here]
+            st.subheader("Meta Data")
+            c1, c2, c3, c4 = st.columns(4)
+            wo_number = c1.text_input("WO Number *")
+            supervisor = c2.text_input("Supervisor Name")
+            department = c3.selectbox("Department / Section", ["", "Static", "Rotating", "Electrical", "Instrument", "Scaffolding", "Boom Truck", "Crane", "Insulation"])
+            shift = c4.selectbox("Shift", ["", "Day", "Night"])
+            done_by = st.text_input("Done By (default to Receiver Name if blank)")
+
+            st.subheader("Permit (WPR)")
+            c1, c2, c3, c4 = st.columns(4)
+            receiver_name = c1.text_input("Receiver Name")
+            position = c2.text_input("Position")
+            wpr_date = c3.date_input("WPR Date")
+            crew_members = c4.text_input("Crew Members")
+
+            c1, c2, c3, c4 = st.columns(4)
+            permit_number = c1.text_input("Permit Number")
+            plant_rtm_no = c2.text_input("Plant/RTM No")
+            wo_description = c3.text_input("WO Description")
+            wpr_remarks = c4.text_input("Remarks (WPR)")
+
+            c1, c2, c3 = st.columns(3)
+            t_req = c1.text_input("Time Requesting Permit (HH:MM)")
+            t_prep = c2.text_input("Issuer Start SWP Prep (HH:MM)")
+            t_issue = c3.text_input("Time of Permit Issuance (HH:MM)")
+
+            c1, c2, c3 = st.columns(3)
+            t_start = c1.text_input("Work Start (HH:MM)")
+            t_finish = c2.text_input("Work Finish (HH:MM)")
+            t_close = c3.text_input("SWP Closing (HH:MM)")
+
+            st.subheader("DMR (Maintenance Report)")
+            c1, c2, c3 = st.columns(3)
+            area = c1.text_input("Area")
+            unit = c2.text_input("Unit")
+            tag_number = c3.text_input("Tag Number")
+
+            observation = st.text_area("Observation / findings")
+            recommendation = st.text_area("Recommendation")
+
+            c1, c2, c3 = st.columns(3)
+            mr_date = c1.date_input("Maintenance Date")
+            status = c2.selectbox("Status", ["Open", "On-progress", "Completed", "Cancelled"])
+            reason_remark = c3.text_input("Reason / Remark")
+
+            c1, c2 = st.columns(2)
+            root_cause = c1.text_input("Root Cause")
+            section = c2.text_input("Section", value=department or "")
+
+            report_date = st.date_input("Report Date")
             
             submitted = st.form_submit_button("Submit to Cloud Vault")
 
+        # 🚨 This block only runs after the button is pressed
         if submitted:
             if not wo_number.strip():
-                st.error("WO Number is required.")
+                st.error("Dharma Violation: WO Number is required.")
                 st.stop()
 
-            # Prepare time data
+            # 1. Standardize Time Data
             times = {k: parse_time(v) for k, v in {
                 "time_of_requesting_permit": t_req,
                 "time_of_issuer_starting_swp_preperation": t_prep,
@@ -203,11 +253,11 @@ if check_password():
             }.items()}
 
             try:
-                # 🚨 PROFESSIONAL CLOUD SYNC
+                # 2. Establish Cloud Connection
                 conn = get_connection() 
                 with conn: # Handles Transaction automatically
                     with conn.cursor() as cur:
-                        # 1) UPSERT Meta Data (Postgres Syntax)
+                        # 3) UPSERT Meta Data (Postgres Syntax)
                         cur.execute("""
                             INSERT INTO work_order_meta (wo_number, supervisor, department, shift, done_by)
                             VALUES (%s, %s, %s, %s, %s)
@@ -218,7 +268,7 @@ if check_password():
                                 done_by=EXCLUDED.done_by
                         """, (wo_number.strip(), supervisor or None, department or None, shift or None, done_by or receiver_name or None))
 
-                        # 2) Payload Creation
+                        # 4) Payload Creation
                         wpr_payload = {
                             "receiver_name": receiver_name or None,
                             "position": position or None,
@@ -248,12 +298,12 @@ if check_password():
                             "report_date": str(parse_date(report_date).date())
                         }
 
-                        # 3) Execute Cloud Inserts via Utils
+                        # 5) Cloud Injection via Utils helpers
                         insert_wpr(conn, wpr_payload)
                         insert_dmr(conn, dmr_payload)
 
                 st.success(f"✅ WO {wo_number} synchronized with Frankfurt Cloud Vault.")
-                st.cache_data.clear() # Refresh dashboards with new data
+                st.cache_data.clear() # Refresh dashboards with fresh cloud data
 
             except Exception as e:
                 st.error(f"❌ Cloud Sync Failed — {e}")
